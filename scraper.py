@@ -1,6 +1,7 @@
 import os
 import json
 import requests
+import re
 from bs4 import BeautifulSoup
 import gspread
 from google.oauth2.service_account import Credentials
@@ -18,16 +19,17 @@ def get_price():
     response = requests.get(URL, headers=headers)
     soup = BeautifulSoup(response.text, 'html.parser')
     
-    # Próba znalezienia ceny w metadanych (najczęstszy standard w e-commerce)
+    # 1. Próba znalezienia ceny w ustandaryzowanych metadanych e-commerce
     price_tag = soup.find("meta", property="product:price:amount")
     if price_tag:
-        return price_tag["content"]
+        return f"{price_tag['content']} zł"
     
-    # Alternatywa: szukanie po klasach HTML (może wymagać dostosowania, jeśli Camper zmieni strukturę strony)
-    # Znajduje pierwszy element zawierający 'zł'
-    for element in soup.find_all(['span', 'div', 'p']):
-        if 'zł' in element.text and element.text.strip()[0].isdigit():
-            return element.text.strip().replace('\xa0', ' ')
+    # 2. Alternatywa: szukanie ścisłego wzorca (np. "715 zł", "1 299,00 zł") w tekście
+    text = soup.get_text(separator=' ')
+    match = re.search(r'(\d[\d\s\xa0.,]*zł)', text)
+    if match:
+        # Zwracamy czysty wynik pozbawiony sztucznych twardych spacji
+        return re.sub(r'\s+', ' ', match.group(1)).strip()
             
     return "Nie znaleziono ceny"
 
@@ -37,12 +39,10 @@ def update_sheet(price):
         "https://www.googleapis.com/auth/drive"
     ]
     
-    # Wczytywanie poświadczeń z GitHub Secrets
     creds_dict = json.loads(GCP_JSON)
     creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
     client = gspread.authorize(creds)
     
-    # Otwieranie arkusza i dodawanie nowego wiersza
     sheet = client.open_by_key(SHEET_ID).sheet1
     date_now = datetime.now().strftime("%Y-%m-%d %H:%M")
     
