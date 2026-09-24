@@ -27,5 +27,8 @@ jobs:
       env:
         SHEET_ID: ${{ secrets.SHEET_ID }}
         GCP_CREDENTIALS: ${{ secrets.GCP_CREDENTIALS }}
+        SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
+        EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+        RECEIVER_EMAIL: ${{ secrets.RECEIVER_EMAIL }}
       run: |
         python scraper.py
