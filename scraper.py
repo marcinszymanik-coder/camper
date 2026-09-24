@@ -2,6 +2,8 @@ import os
 import json
 import requests
 import re
+import smtplib
+from email.mime.text import MIMEText
 from bs4 import BeautifulSoup
 import gspread
 from google.oauth2.service_account import Credentials
@@ -16,19 +18,22 @@ URLS = [
 SHEET_ID = os.environ.get("SHEET_ID")
 GCP_JSON = os.environ.get("GCP_CREDENTIALS")
 
+# Dane do e-maila
+SENDER_EMAIL = os.environ.get("SENDER_EMAIL")
+EMAIL_PASSWORD = os.environ.get("EMAIL_PASSWORD")
+RECEIVER_EMAIL = os.environ.get("RECEIVER_EMAIL")
+
 def get_price(url):
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36"
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
     }
     response = requests.get(url, headers=headers)
     soup = BeautifulSoup(response.text, 'html.parser')
     
-    # Szukanie ceny w metadanych
     price_tag = soup.find("meta", property="product:price:amount")
     if price_tag:
         return f"{price_tag['content']} zł"
     
-    # Alternatywa w razie braku metadanych (regex)
     text = soup.get_text(separator=' ')
     match = re.search(r'(\d[\d\s\xa0.,]*zł)', text)
     if match:
@@ -46,20 +51,44 @@ def update_sheet(data_rows):
     creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
     client = gspread.authorize(creds)
     
-    # Otwarcie arkusza i dodanie wielu wierszy na raz
     sheet = client.open_by_key(SHEET_ID).sheet1
     sheet.append_rows(data_rows)
+    print("Zapisano dane w Arkuszu Google.")
+
+def send_email(data_rows):
+    if not SENDER_EMAIL or not EMAIL_PASSWORD or not RECEIVER_EMAIL:
+        print("Brak danych logowania e-mail. Pomijam wysyłanie wiadomości.")
+        return
+
+    subject = "Raport cenowy: Buty Camper"
+    body = "Cześć,\n\noto aktualne ceny butów z dzisiejszego sprawdzenia:\n\n"
     
     for row in data_rows:
-        print(f"Dodano wpis: {row[0]} - {row[1]} dla linku {row[2][-11:]}")
+        body += f"- Cena: {row[1]} (Link: {row[2]})\n"
+
+    msg = MIMEText(body)
+    msg['Subject'] = subject
+    msg['From'] = SENDER_EMAIL
+    msg['To'] = RECEIVER_EMAIL
+
+    try:
+        # Konfiguracja dla serwerów poczty Gmail
+        server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
+        server.login(SENDER_EMAIL, EMAIL_PASSWORD)
+        server.sendmail(SENDER_EMAIL, RECEIVER_EMAIL, msg.as_string())
+        server.quit()
+        print("Wysłano powiadomienie e-mail.")
+    except Exception as e:
+        print(f"Wystąpił błąd podczas wysyłania e-maila: {e}")
 
 if __name__ == "__main__":
     date_now = datetime.now().strftime("%Y-%m-%d %H:%M")
     results = []
     
-    # Pętla pobierająca ceny dla każdego linku z listy
     for url in URLS:
         price = get_price(url)
         results.append([date_now, price, url])
+        print(f"Pobrano: {price} dla linku {url[-11:]}")
         
     update_sheet(results)
+    send_email(results)
