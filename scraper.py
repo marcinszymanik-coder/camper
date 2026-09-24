@@ -25,15 +25,17 @@ RECEIVER_EMAIL = os.environ.get("RECEIVER_EMAIL")
 
 def get_price(url):
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36"
     }
     response = requests.get(url, headers=headers)
     soup = BeautifulSoup(response.text, 'html.parser')
     
+    # Szukanie ceny w metadanych e-commerce
     price_tag = soup.find("meta", property="product:price:amount")
     if price_tag:
         return f"{price_tag['content']} zł"
     
+    # Alternatywa: szukanie wzorca ceny w tekście
     text = soup.get_text(separator=' ')
     match = re.search(r'(\d[\d\s\xa0.,]*zł)', text)
     if match:
@@ -47,13 +49,16 @@ def update_sheet(data_rows):
         "https://www.googleapis.com/auth/drive"
     ]
     
-    creds_dict = json.loads(GCP_JSON)
-    creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
-    client = gspread.authorize(creds)
-    
-    sheet = client.open_by_key(SHEET_ID).sheet1
-    sheet.append_rows(data_rows)
-    print("Zapisano dane w Arkuszu Google.")
+    try:
+        creds_dict = json.loads(GCP_JSON)
+        creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
+        client = gspread.authorize(creds)
+        
+        sheet = client.open_by_key(SHEET_ID).sheet1
+        sheet.append_rows(data_rows)
+        print("Zapisano dane w Arkuszu Google.")
+    except Exception as e:
+        print(f"Błąd podczas zapisu do Arkusza Google: {e}")
 
 def send_email(data_rows):
     if not SENDER_EMAIL or not EMAIL_PASSWORD or not RECEIVER_EMAIL:
@@ -69,15 +74,19 @@ def send_email(data_rows):
     msg = MIMEText(body)
     msg['Subject'] = subject
     msg['From'] = SENDER_EMAIL
-    msg['To'] = RECEIVER_EMAIL
+    msg['To'] = RECEIVER_EMAIL # Nagłówek maila akceptuje format po przecinku
+
+    # Podział tekstu po przecinku na listę adresów (dla wielu odbiorców)
+    receiver_list = [email.strip() for email in RECEIVER_EMAIL.split(',')]
 
     try:
-        # Konfiguracja dla serwerów poczty Gmail
         server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
         server.login(SENDER_EMAIL, EMAIL_PASSWORD)
-        server.sendmail(SENDER_EMAIL, RECEIVER_EMAIL, msg.as_string())
+        
+        # Wysłanie wiadomości do listy odbiorców
+        server.sendmail(SENDER_EMAIL, receiver_list, msg.as_string())
         server.quit()
-        print("Wysłano powiadomienie e-mail.")
+        print(f"Wysłano powiadomienie e-mail na adresy: {RECEIVER_EMAIL}")
     except Exception as e:
         print(f"Wystąpił błąd podczas wysyłania e-maila: {e}")
 
