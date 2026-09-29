@@ -13,7 +13,13 @@ from datetime import datetime
 URLS = [
     "https://www.camper.com/pl_PL/men/shoes/peu/camper-peu_path_-K300558-005",
     "https://www.camper.com/pl_PL/men/shoes/peu/camper-peu_path_-K300558-004",
-    "https://www.camper.com/pl_PL/men/shoes/peu/camper-peu_path_-K300558-002"
+    "https://www.camper.com/pl_PL/men/shoes/peu/camper-peu_path_-K300558-002",
+    "https://www.camper.com/pl_PL/men/shoes/peu/camper-peu_path_-K101114-002",
+    "https://www.camper.com/pl_PL/men/shoes/peu/camper-peu_path_-K101114-005",
+    "https://www.camper.com/pl_PL/men/shoes/peu/camper-peu_path_-K101114-007",
+    "https://www.camper.com/pl_PL/men/shoes/peu/camper-peu_path_-K101114-010",
+    "https://www.camper.com/pl_PL/men/shoes/peu/camper-peu_path_-K101114-011",
+    "https://www.camper.com/pl_PL/men/shoes/peu/camper-peu_path_-K101114-012"
 ]
 SHEET_ID = os.environ.get("SHEET_ID")
 GCP_JSON = os.environ.get("GCP_CREDENTIALS")
